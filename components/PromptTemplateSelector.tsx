@@ -20,11 +20,8 @@ const PromptTemplateSelector: React.FC<PromptTemplateSelectorProps> = ({
   selectedCategory,
   onSelectCategory,
 }) => {
-  const allCategorizedTemplates = selectedCategory ? selectedCategory.templates : [];
-
   // Combine user templates into a 'Custom' category if no specific category is selected
-  // Or display them alongside built-in ones if within a category (though typically user templates are global)
-  // For now, let's add a "自定义" category at the top level.
+  // This category is only shown at the top level
   const customTemplatesCategory: TemplateCategory = {
     id: 'custom-templates',
     name: '自定义模板',
@@ -52,8 +49,8 @@ const PromptTemplateSelector: React.FC<PromptTemplateSelectorProps> = ({
           </svg>
           返回分类
         </button>
-        <div className="flex-grow overflow-y-auto pr-2 -mr-2 scrollbar-thumb-blue-400 scrollbar-track-blue-100 scrollbar-thin">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="flex-grow overflow-y-auto pr-2 -mr-2 scrollbar-thumb-blue-400 scrollbar-track-blue-100 scrollbar-thin min-h-0"> {/* Added min-h-0 */}
+          <div className="grid grid-cols-1 gap-4"> {/* Removed sm:grid-cols-2 for single column clarity */}
             {templatesToDisplay.map((template) => (
               <button
                 key={template.id}
@@ -86,7 +83,7 @@ const PromptTemplateSelector: React.FC<PromptTemplateSelectorProps> = ({
   } else {
     // Display categories
     return (
-      <div className="flex-grow overflow-y-auto pr-2 -mr-2 scrollbar-thumb-blue-400 scrollbar-track-blue-100 scrollbar-thin">
+      <div className="flex-grow overflow-y-auto pr-2 -mr-2 scrollbar-thumb-blue-400 scrollbar-track-blue-100 scrollbar-thin min-h-0"> {/* Added min-h-0 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {currentCategories.map((category) => (
             <button
