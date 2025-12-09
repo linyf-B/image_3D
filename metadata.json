@@ -1,5 +1,5 @@
 {
-  "name": "Nano Banana Image Editor",
-  "description": "An innovative app powered by Gemini 2.5 Flash Image, allowing users to edit images using text prompts like 'Add a retro filter' or 'Remove the person in the background'.",
+  "name": "AI图像编辑大师",
+  "description": "由Gemini 2.5 Flash Image驱动的创新应用，通过文本提示轻松编辑图片。支持模板分类、自定义模板、AI提示词建议和编辑历史管理，提供直观的三栏布局。",
   "requestFramePermissions": []
 }

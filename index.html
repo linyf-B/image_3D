@@ -1,23 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nano Banana Image Editor</title>
+    <title>AI图像编辑大师</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <script type="importmap">
 {
   "imports": {
     "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "react": "https://aistudiocdn.com/react@^19.2.1",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.32.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/"
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0"
   }
 }
 </script>
+    <style>
+      body {
+        font-family: 'Noto Sans SC', sans-serif;
+      }
+      /* Custom scrollbar styles */
+      .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: var(--tw-blue-400) var(--tw-blue-100);
+      }
+      .scrollbar-thumb-blue-400 {
+        --tw-scrollbar-thumb: #60a5fa; /* blue-400 */
+      }
+      .scrollbar-track-blue-100 {
+        --tw-scrollbar-track: #dbeafe; /* blue-100 */
+      }
+      /* Webkit browsers (Chrome, Safari) */
+      .scrollbar-thin::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .scrollbar-thin::-webkit-scrollbar-thumb {
+        background-color: var(--tw-blue-400);
+        border-radius: 10px;
+        border: 2px solid var(--tw-blue-100);
+      }
+      .scrollbar-thin::-webkit-scrollbar-track {
+        background-color: var(--tw-blue-100);
+        border-radius: 10px;
+      }
+    </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-    <div id="root"></div>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 h-full w-full overflow-hidden">
+    <div id="root" class="h-full w-full"></div>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>
