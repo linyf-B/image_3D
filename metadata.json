@@ -1,0 +1,5 @@
+{
+  "name": "Nano Banana Image Editor",
+  "description": "An innovative app powered by Gemini 2.5 Flash Image, allowing users to edit images using text prompts like 'Add a retro filter' or 'Remove the person in the background'.",
+  "requestFramePermissions": []
+}
