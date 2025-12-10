@@ -7,14 +7,13 @@ import AddTemplateModal from './components/AddTemplateModal';
 import HistoryPanel from './components/HistoryPanel';
 import UnifiedImageDisplay from './components/UnifiedImageDisplay';
 import { editImage } from './services/geminiService';
-import { PromptTemplate, HistoryEntry, TemplateCategory, UploadedImage, User } from './types';
+import { PromptTemplate, HistoryEntry, TemplateCategory, UploadedImage, User, PaymentConfig } from './types';
 import { authService } from './services/authService'; // New auth service
 import AuthModal from './components/AuthModal'; // New auth modal
 import LoginStatus from './components/LoginStatus'; // New login status component
 import PaymentModal from './components/PaymentModal'; // New payment modal
 import AdminPanel from './components/AdminPanel'; // New admin panel
 import { adminService } from './services/adminService'; // Import adminService for default payment config
-
 // Define prompt templates categorized
 const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
   {
@@ -438,6 +437,24 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         description: '使宠物眼睛发出神秘的荧光。',
         prompt: '请使图片中宠物的双眼发出柔和而神秘的绿色荧光。光芒应从瞳孔深处散发，向周围环境投射出淡淡的辉光，使其看起来充满灵性或神秘感，同时不影响面部其他细节。',
       },
+      {
+        id: 'pet-add-glasses',
+        name: '为宠物添加眼镜',
+        description: '为宠物添加一副时尚的眼镜。',
+        prompt: '请为图片中的宠物智能添加一副时尚的圆形复古眼镜。确保眼镜尺寸适合宠物脸部，材质逼真，镜片透明，与宠物面部光影自然融合，使其看起来更具文雅或搞怪气质。',
+      },
+      {
+        id: 'pet-remove-background',
+        name: '宠物智能抠图',
+        description: '将宠物从背景中抠出，生成透明背景图。',
+        prompt: '请智能识别图片中的宠物主体，并将其从背景中精确地抠取出来。生成一张主体边缘清晰、细节保留完整，并且背景完全透明的PNG格式图片（背景为棋盘格），便于后续合成和使用。',
+      },
+      {
+        id: 'pet-change-expression',
+        name: '宠物表情改变',
+        description: '改变宠物表情为惊讶或开心。',
+        prompt: '请微调图片中宠物的面部表情，使其呈现出非常惊讶、大眼睛圆睁、嘴巴微张的表情。保持宠物原有特征和毛发细节，使其表情生动有趣。',
+      },
     ],
   },
   {
@@ -526,7 +543,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
       {
         id: 'anime-character-transform',
         name: '真实人物转动漫角色',
-        description: '将图片中的真实人物（整体）转换为日本动漫风格的角色形象。保留人物的基本特征和神韵，但将其面部和身体比例卡通化，具有动漫人物的大眼睛、小嘴巴和流畅线条，使其看起来像二次元世界中的一员。',
+        description: '将图片中的真实人物（整体）转换为日本动漫风格的角色形象。',
         prompt: '请将图片中的真实人物（整体）转换为日本动漫风格的角色形象。保留人物的基本特征和神韵，但将其面部和身体比例卡通化，具有动漫人物的大眼睛、小嘴巴和流畅线条，使其看起来像二次元世界中的一员。',
       },
       {
@@ -564,6 +581,24 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         name: '调整动漫人物身材比例',
         description: '微调动漫人物身材比例。',
         prompt: '请对图片中动漫人物的身材比例进行微调，使其腿部略微拉长，腰部更加纤细，呈现出更加修长、符合二次元审美的完美比例。同时保持人物整体的自然感和原有风格。',
+      },
+      {
+        id: 'anime-gender-swap',
+        name: '动漫人物性别转换',
+        description: '将图片中的动漫人物进行性别转换。',
+        prompt: '请将图片中动漫人物的性别进行转换。如果原图是男性，则转换为女性动漫角色，如果原图是女性，则转换为男性动漫角色。保持人物核心特征不变，但调整面部、发型、服装等以符合新的性别特征和动漫美学。',
+      },
+      {
+        id: 'anime-age-transform',
+        name: '动漫人物年龄转换',
+        description: '将动漫人物年龄转换为儿童或老年。',
+        prompt: '请将图片中动漫人物的年龄转换为儿童形态。使其面部特征圆润，眼睛更大，身体比例变为Q版可爱风格，服装也变为童趣服饰，整体呈现出年轻活泼的动漫儿童形象。',
+      },
+      {
+        id: 'anime-expression-sad',
+        name: '动漫人物悲伤表情',
+        description: '调整动漫人物表情，使其非常悲伤。',
+        prompt: '请对图片中的动漫人物表情进行调整，使其呈现出非常悲伤、泪眼汪汪、嘴角下垂的表情。眼神应流露出忧郁感，脸颊可能有泪痕，表现出极度的悲伤和失落感。',
       },
     ],
   },
@@ -692,6 +727,24 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         description: '为人物添加像素风墨镜和“Deal With It”文字。',
         prompt: '请为图片中的人物智能添加一副像素风格的黑色墨镜，并使其从画面上方缓缓落下，最终停留在人物的鼻梁上。同时在图片底部添加白色大写文字“DEAL WITH IT”，营造出酷炫、幽默的氛围。',
       },
+      {
+        id: 'meme-add-thought-bubble',
+        name: '添加思想气泡',
+        description: '为表情包人物添加思考气泡。',
+        prompt: '请在图片中的人物或动物头部上方添加一个漫画风格的思考气泡，气泡中包含一段与人物当前情境相符的中文想法（例如：“我在想什么呢？”），增加趣味性。',
+      },
+      {
+        id: 'meme-blur-face',
+        name: '面部打码模糊',
+        description: '对表情包主体面部进行模糊处理。',
+        prompt: '请对图片中表情包主体的人物面部进行柔和的模糊处理，使其无法辨认，但保留面部轮廓。确保模糊区域边缘自然过渡，增加神秘或幽默感。',
+      },
+      {
+        id: 'meme-caption-template',
+        name: '自定义文字模版',
+        description: '在图片顶部和底部添加自定义文字。',
+        prompt: '请在图片顶部添加一行醒目的白色粗体文字“顶部文字”，底部添加一行白色粗体文字“底部文字”。文字均带黑色描边，字体大小和位置自动调整以适应图片，使其成为经典的字幕型表情包。',
+      },
     ],
   },
   {
@@ -818,6 +871,24 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         name: 'HDR效果增强',
         description: '提升图片动态范围和细节，呈现HDR（高动态范围）效果。',
         prompt: '请为图片（整体）应用HDR（高动态范围）效果增强。提升亮部和暗部的细节表现，增加画面的动态对比度，使色彩更加丰富和生动，同时避免出现光晕或不自然感，让图片更具视觉冲击力。',
+      },
+      {
+        id: 'filter-glitch',
+        name: '故障艺术滤镜',
+        description: '为图片添加故障艺术（Glitch Art）效果。',
+        prompt: '请为图片（整体）添加故障艺术（Glitch Art）效果。画面应出现像素错位、色彩分离和扫描线纹理，营造出一种数字错误或信号干扰的视觉冲击力，使其看起来独特而前卫。',
+      },
+      {
+        id: 'filter-anamorphic-flare',
+        name: '变形宽银幕光晕',
+        description: '添加电影般的变形宽银幕镜头光晕。',
+        prompt: '请为图片（整体）添加电影般的变形宽银幕镜头光晕（Anamorphic Lens Flare）。光晕应呈水平条纹状，颜色可为橙色或蓝色，横跨画面，营造出高级电影感和视觉焦点。',
+      },
+      {
+        id: 'filter-cross-process',
+        name: '交叉冲洗滤镜',
+        description: '模拟胶片交叉冲洗的色彩效果。',
+        prompt: '请为图片（整体）应用胶片交叉冲洗（Cross-Process）滤镜效果。画面色彩将出现非自然但富有艺术感的偏色，例如绿色偏蓝、蓝色偏绿，对比度提升，营造出独特、实验性的视觉风格。',
       },
     ],
   },
@@ -946,6 +1017,36 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         description: '将图片内容进行水平镜像翻转。',
         prompt: '请将图片内容进行水平镜像翻转。所有内容将左右颠倒，保持垂直方向不变，生成一张镜像图片。',
       },
+      {
+        id: 'remove-shadows',
+        name: '去除阴影 (人物)',
+        description: '去除人物身上的不自然阴影。',
+        prompt: '请智能识别图片中人物身上的不自然或过重的阴影，并进行柔化或移除处理，使人物光线均匀自然，突出立体感，同时保留必要的明暗对比以保持真实感。',
+      },
+      {
+        id: 'change-time-day-night',
+        name: '时间转换：白天转夜晚',
+        description: '将图片场景从白天转换为夜晚。',
+        prompt: '请将图片中的场景（整体）从白天转换为夜晚。画面应呈现出深蓝色调，光线柔和，天空出现星辰或月亮。所有光源（如灯光）应被点亮，物体表面产生相应的夜间光影效果。',
+      },
+      {
+        id: 'add-fog',
+        name: '添加雾气效果',
+        description: '为场景添加一层薄雾，营造神秘或朦胧感。',
+        prompt: '请在图片中添加一层薄薄的、半透明的雾气效果。雾气应均匀分布在背景或中景，使得远景略显模糊，营造出神秘、朦胧或清晨的氛围，但要确保主体依然清晰可见。',
+      },
+      {
+        id: 'colorize-greyscale',
+        name: '黑白图片上色',
+        description: '为黑白图片智能添加自然色彩。',
+        prompt: '请智能识别并为这张黑白图片（整体）添加自然、逼真的色彩。AI应根据图片内容自动推断出合适的颜色，使画面看起来像一张彩色照片，色彩过渡自然和谐。',
+      },
+      {
+        id: 'remove-facial-blemishes',
+        name: '去除面部瑕疵',
+        description: '智能去除面部痘痘、斑点、黑眼圈等。',
+        prompt: '请对图片中人物面部进行精细修复，智能去除痘痘、雀斑、小疤痕、黑眼圈等瑕疵。同时保留皮肤的自然纹理和光泽，使面部看起来更加光滑、洁净，但不过度磨皮，保持真实感。',
+      },
     ],
   },
 ];
@@ -953,14 +1054,16 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
 
 const LOCAL_STORAGE_HISTORY_KEY = 'aiImageEditorHistory';
 const LOCAL_STORAGE_USER_TEMPLATES_KEY = 'aiImageEditorUserTemplates';
-// Admin user is seeded by authService, default payment config is also handled by authService via User credits.
 
 // Add export default to the App component
 const App: React.FC = () => {
   // --- Auth States ---
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login'); // 'login' or 'register'
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+
+  // --- Payment Config State (Reactive) ---
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig>(adminService.getPaymentConfig());
 
   // --- Image management states for multiple uploads ---
   const [allUploadedImages, setAllUploadedImages] = useState<UploadedImage[]>([]);
@@ -974,11 +1077,11 @@ const App: React.FC = () => {
   const selectedImageMimeType = activeImage?.mimeType || null;
   // --- End: Image management states ---
 
-  const [editedImageBase64, setEditedImageBase64] = useState<string | null>(null); // This is the AI-generated result
+  const [editedImageBase64, setEditedImageBase64] = useState<string | null>(null);
 
-  const [prompt, setPrompt] = useState<string>(''); // User's typed prompt
+  const [prompt, setPrompt] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false); // For image editing
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -986,13 +1089,11 @@ const App: React.FC = () => {
   const [showAddTemplateModal, setShowAddTemplateModal] = useState<boolean>(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  // Removed states for AI prompt suggestions
-
   // New state for template categorization
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | null>(null);
 
   // Credits for payment feature hint, linked to currentUser
-  const [credits, setCredits] = useState<number>(0); // Initialize with 0, load from authService
+  const [credits, setCredits] = useState<number>(0);
 
   // State for payment modal
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
@@ -1006,9 +1107,6 @@ const App: React.FC = () => {
     setCurrentUser(user);
     if (user) {
       setCredits(user.credits);
-      // Load user-specific history and templates
-      // In a real app, these would be fetched from a backend tied to currentUser.id.
-      // For this simulation, we're using localStorage, but clearing if no user.
       const storedUserTemplates = localStorage.getItem(LOCAL_STORAGE_USER_TEMPLATES_KEY);
       if (storedUserTemplates) {
         setUserTemplates(JSON.parse(storedUserTemplates));
@@ -1022,15 +1120,15 @@ const App: React.FC = () => {
         setHistory([]);
       }
     } else {
-      // Guest user simulation: provide initial credits, clear personal data
-      const paymentConfig = adminService.getPaymentConfig(); // Get initial credits from config
-      setCredits(paymentConfig.initialFreeCredits);
+      // Guest user simulation
+      const currentConfig = adminService.getPaymentConfig();
+      setCredits(currentConfig.initialFreeCredits);
       setHistory([]);
       setUserTemplates([]);
       localStorage.removeItem(LOCAL_STORAGE_HISTORY_KEY);
       localStorage.removeItem(LOCAL_STORAGE_USER_TEMPLATES_KEY);
     }
-    // Also clear image states when user changes (e.g., guest to logged in, or logged out)
+    // Also clear image states when user changes
     setEditedImageBase64(null);
     setAllUploadedImages([]);
     setActiveImageId(null);
@@ -1052,7 +1150,7 @@ const App: React.FC = () => {
       setCredits(user.credits);
       setShowAuthModal(false);
       setError(null);
-      loadCurrentUserState(); // Explicitly reload all user states including history/templates
+      loadCurrentUserState();
       return true;
     } else {
       setError("登录失败，请检查用户名或密码。");
@@ -1067,7 +1165,7 @@ const App: React.FC = () => {
       setCredits(user.credits);
       setShowAuthModal(false);
       setError(null);
-      loadCurrentUserState(); // Explicitly reload all user states including history/templates
+      loadCurrentUserState();
       return true;
     } else {
       setError("注册失败，用户名可能已占用。");
@@ -1076,23 +1174,20 @@ const App: React.FC = () => {
   }, [loadCurrentUserState]);
 
   const handleLogout = useCallback(() => {
-    if (window.confirm("确定要退出登录吗？")) {
-      authService.logout();
-      // Reset App state to non-logged-in/guest state
-      setCurrentUser(null);
-      setEditedImageBase64(null); // Clear edited image
-      setAllUploadedImages([]); // Clear uploaded images
-      setActiveImageId(null);
-      setShowAdminPanel(false); // Close admin panel on logout
-      setError(null);
-      loadCurrentUserState(); // Explicitly reload state after logout to ensure consistency
-    }
+    // Direct logout without confirmation dialog to prevent blocking issues
+    authService.logout();
+    setCurrentUser(null);
+    setEditedImageBase64(null);
+    setAllUploadedImages([]);
+    setActiveImageId(null);
+    setShowAdminPanel(false);
+    setError(null);
+    loadCurrentUserState(); // Reset UI state immediately
   }, [loadCurrentUserState]);
 
   const handleUpdateCredits = useCallback(async (amount: number) => {
     if (!currentUser) {
-        setCredits(prev => prev + amount); // Update guest credits directly for simulation
-        // No persistence for guest credits beyond current session in this simple simulation
+        setCredits(prev => prev + amount);
         return;
     }
     const newCredits = currentUser.credits + amount;
@@ -1101,13 +1196,17 @@ const App: React.FC = () => {
     setCredits(newCredits);
   }, [currentUser]);
 
-  // Save user templates to local storage whenever they change
+  // Callback to update payment config state when admin changes it
+  const handlePaymentConfigUpdate = useCallback((newConfig: PaymentConfig) => {
+    setPaymentConfig(newConfig);
+  }, []);
+
+  // Save user templates to local storage
   useEffect(() => {
     try {
-      // In a real app, user templates would be saved to a backend tied to currentUser.id
-      if (currentUser) { // Only save if a user is logged in
+      if (currentUser) {
         localStorage.setItem(LOCAL_STORAGE_USER_TEMPLATES_KEY, JSON.stringify(userTemplates));
-      } else if (userTemplates.length === 0 && localStorage.getItem(LOCAL_STORAGE_USER_TEMPLATES_KEY) !== null) { // If guest, and templates are cleared, remove from storage
+      } else if (userTemplates.length === 0 && localStorage.getItem(LOCAL_STORAGE_USER_TEMPLATES_KEY) !== null) {
         localStorage.removeItem(LOCAL_STORAGE_USER_TEMPLATES_KEY);
       }
     } catch (e) {
@@ -1115,13 +1214,12 @@ const App: React.FC = () => {
     }
   }, [userTemplates, currentUser]);
 
-  // Save history to local storage whenever it changes
+  // Save history to local storage
   useEffect(() => {
     try {
-      // In a real app, history would be saved to a backend tied to currentUser.id
-      if (currentUser) { // Only save if a user is logged in
+      if (currentUser) {
         localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(history));
-      } else if (history.length === 0 && localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY) !== null) { // If guest, and history is cleared, remove from storage
+      } else if (history.length === 0 && localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY) !== null) {
         localStorage.removeItem(LOCAL_STORAGE_HISTORY_KEY);
       }
     } catch (e) {
@@ -1129,14 +1227,14 @@ const App: React.FC = () => {
     }
   }, [history, currentUser]);
 
-  // Flatten all templates (categorized and user-defined) for searching
   const allTemplates = useMemo(() => {
-    const categorizedFlatTemplates = INITIAL_CATEGORIZED_TEMPLATES.flatMap(cat => cat.templates);
+    // Fallback if categories are somehow undefined
+    const categories = INITIAL_CATEGORIZED_TEMPLATES || [];
+    const categorizedFlatTemplates = categories.flatMap(cat => cat.templates);
     return [...categorizedFlatTemplates, ...userTemplates];
   }, [userTemplates]);
 
 
-  // --- Start: Modified handleImageSelect to support multiple images ---
   const handleImageSelect = useCallback((newImages: UploadedImage[], selectedId?: string) => {
     setAllUploadedImages(newImages);
     if (newImages.length > 0) {
@@ -1144,32 +1242,27 @@ const App: React.FC = () => {
     } else {
       setActiveImageId(null);
     }
-    setEditedImageBase64(null); // Clear previous edited image
+    setEditedImageBase64(null);
     setError(null);
     setPrompt('');
     setSelectedTemplateId(null);
-    setSelectedCategory(null); // Clear category selection on new image
+    setSelectedCategory(null);
     if (promptInputRef.current) {
       promptInputRef.current.focus();
     }
   }, []);
-  // --- End: Modified handleImageSelect ---
 
-  // --- Start: Modified handleClearImage to handle active image or all images ---
   const handleClearImage = useCallback((imageIdToClear?: string) => {
     if (imageIdToClear) {
-      // Clear a specific image
       setAllUploadedImages(prevImages => {
         const remainingImages = prevImages.filter(img => img.id !== imageIdToClear);
         if (activeImageId === imageIdToClear) {
-          // If the active image is cleared, set the next one as active or clear activeId
           setActiveImageId(remainingImages.length > 0 ? remainingImages[0].id : null);
-          setEditedImageBase64(null); // Clear edited result if active image changes
+          setEditedImageBase64(null);
         }
         return remainingImages;
       });
     } else {
-      // Clear all images (original functionality)
       setAllUploadedImages([]);
       setActiveImageId(null);
       setEditedImageBase64(null);
@@ -1178,9 +1271,8 @@ const App: React.FC = () => {
     setError(null);
     setPrompt('');
     setSelectedTemplateId(null);
-    setSelectedCategory(null); // Clear category selection
+    setSelectedCategory(null);
   }, [activeImageId]);
-  // --- End: Modified handleClearImage ---
 
 
   const handleSelectTemplate = useCallback((template: PromptTemplate) => {
@@ -1206,8 +1298,6 @@ const App: React.FC = () => {
       id: uuidv4(),
       isUserDefined: true,
     };
-
-    // Store template, even if assigned to a category, it's still a userTemplate
     setUserTemplates((prev) => [...prev, template]);
     setShowAddTemplateModal(false);
   }, []);
@@ -1239,7 +1329,7 @@ const App: React.FC = () => {
       categoryName: categoryName,
     };
     setHistory((prevHistory) => [newHistoryEntry, ...prevHistory]);
-  }, [allTemplates, INITIAL_CATEGORIZED_TEMPLATES]);
+  }, [allTemplates]);
 
 
   const handleEditImage = useCallback(async () => {
@@ -1249,7 +1339,7 @@ const App: React.FC = () => {
     }
     if (credits <= 0) {
       setError("您的积分不足，请充值。");
-      setShowPaymentModal(true); // Show payment modal if credits are 0
+      setShowPaymentModal(true);
       return;
     }
     
@@ -1258,15 +1348,12 @@ const App: React.FC = () => {
     try {
       const result = await editImage(selectedImageBase64, selectedImageMimeType, prompt);
       if (result) {
-        // Deduct credit on successful generation
         handleUpdateCredits(-1);
         setEditedImageBase64(result);
         
-        // Use activeImage's base64/mimeType for history, not selectedImageBase64 (which might be null after an intermediate clear)
         if (activeImage) {
             addToHistory(activeImage.base64, activeImage.mimeType, result, prompt, selectedTemplateId);
         } else {
-            // Fallback, though activeImage should exist if selectedImageBase64 exists
             addToHistory(selectedImageBase64, selectedImageMimeType, result, prompt, selectedTemplateId);
         }
 
@@ -1285,13 +1372,12 @@ const App: React.FC = () => {
   }, [activeImage, selectedImageBase64, selectedImageMimeType, prompt, credits, selectedTemplateId, addToHistory, handleUpdateCredits]);
 
   const handleDownloadEditedImage = useCallback(() => {
-    // This function is now passed to UnifiedImageDisplay
-    // UnifiedImageDisplay will call it with the currently displayed edited image base64
+    // Handled in UnifiedImageDisplay
   }, []);
 
   const handleClearCurrentSession = useCallback(() => {
     if (window.confirm("确定要清空当前会话中的图片和提示词吗？此操作不可撤销。")) {
-      handleClearImage(); // Clears all image states, including all uploaded images
+      handleClearImage();
       setPrompt('');
       setSelectedTemplateId(null);
       setSelectedCategory(null);
@@ -1303,19 +1389,17 @@ const App: React.FC = () => {
   }, [handleClearImage]);
 
   const handleLoadHistoryItem = useCallback((entry: HistoryEntry) => {
-    // When loading from history, we set the original image as the *only* uploaded image
     const historyImage: UploadedImage = {
         id: uuidv4(),
         base64: entry.originalImageBase64,
         mimeType: entry.originalImageMimeType,
-        fileName: 'history_original.png' // Generic name
+        fileName: 'history_original.png'
     };
     setAllUploadedImages([historyImage]);
     setActiveImageId(historyImage.id);
 
     setEditedImageBase64(entry.editedImageBase64);
     setPrompt(entry.prompt);
-    // When loading from history, clear template/category selection as it's a specific prompt
     setSelectedTemplateId(null);
     setSelectedCategory(null);
     setError(null);
@@ -1331,8 +1415,8 @@ const App: React.FC = () => {
   const canEdit = !isLoading && selectedImageBase64 && prompt.trim() && credits > 0;
 
   return (
-    <div className="flex h-full w-full p-4 gap-4"> {/* Outer container, full screen, with padding and gap */}
-      {/* 左侧面板: 历史记录 */}
+    <div className="flex h-full w-full p-4 gap-4">
+      {/* Left Panel: History */}
       <div className="flex flex-col w-[280px] p-4 border border-gray-100 rounded-xl shadow-lg bg-white overflow-hidden">
         <LoginStatus
           currentUser={currentUser}
@@ -1344,7 +1428,7 @@ const App: React.FC = () => {
         <HistoryPanel history={history} onLoadHistoryItem={handleLoadHistoryItem} onDeleteHistoryItem={handleDeleteHistoryItem} />
       </div>
 
-      {/* 中间面板: 图片上传，提示词输入，编辑结果展示 */}
+      {/* Center Panel: Editor */}
       <div className="flex flex-col flex-grow p-6 border border-gray-100 rounded-xl shadow-lg bg-white overflow-y-auto scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-blue-100">
         <h2 className="text-3xl font-bold text-gray-800 mb-6 w-full text-center">AI图像编辑大师</h2>
         
@@ -1353,8 +1437,7 @@ const App: React.FC = () => {
           <button className="ml-4 text-blue-500 hover:text-blue-700 font-medium" onClick={() => setShowPaymentModal(true)}>充值</button>
         </div>
 
-        <div className="flex flex-col gap-6 flex-[2] min-h-0"> {/* Main editor area, 2/3 height, scrollable */}
-          {/* Unified Image Display */}
+        <div className="flex flex-col gap-6 flex-[2] min-h-0">
           <UnifiedImageDisplay
             allUploadedImages={allUploadedImages}
             activeImageId={activeImageId}
@@ -1368,15 +1451,14 @@ const App: React.FC = () => {
                 link.download = `edited_image_${Date.now()}.png`;
                 document.body.appendChild(link);
                 link.click();
-                document.body.removeChild(link); // Clean up the link element
+                document.body.removeChild(link);
               }
             }}
-            onMergeRequest={() => {}} // Placeholder for removed functionality
+            onMergeRequest={() => {}}
             isLoading={isLoading}
             setActiveImageId={setActiveImageId}
           />
 
-          {/* Clear Session Button */}
           {(allUploadedImages.length > 0 || editedImageBase64 || prompt.trim()) && (
             <button
               onClick={handleClearCurrentSession}
@@ -1387,7 +1469,6 @@ const App: React.FC = () => {
             </button>
           )}
 
-          {/* Prompt Input and Edit Button */}
           <div className="flex flex-col gap-4 w-full mt-4">
             <label htmlFor="prompt-input" className="text-base font-semibold text-gray-700">
               您的提示词:
@@ -1438,7 +1519,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* 右侧面板: 模板选择器 */}
+      {/* Right Panel: Templates */}
       <div className="flex flex-col w-[320px] p-6 border border-gray-100 rounded-xl shadow-lg bg-white flex-grow-0 flex-shrink-0 min-h-0 h-full">
         <div className="flex justify-between items-center mb-4 sticky top-0 bg-white py-2 z-10">
           <h3 className="text-lg font-semibold text-gray-700">选择模板:</h3>
@@ -1488,7 +1569,7 @@ const App: React.FC = () => {
             handleUpdateCredits(amount);
             setShowPaymentModal(false);
           }}
-          pricePerCredit={adminService.getPaymentConfig().pricePerCredit}
+          pricePerCredit={paymentConfig.pricePerCredit} // Reactive price
           disabled={isLoading}
         />
       )}
@@ -1503,18 +1584,18 @@ const App: React.FC = () => {
               setCurrentUser(updatedUser);
               setCredits(updatedUser.credits);
             }
-            setShowAdminPanel(false); // Force re-render of user list by closing/opening (simple fix)
-            setTimeout(() => setShowAdminPanel(true), 0);
+            setShowAdminPanel(false);
+            setShowAdminPanel(true);
           }}
           onDeleteUser={(userId) => {
             authService.deleteUser(userId);
             if (currentUser.id === userId) {
               handleLogout();
-            } else {
-              setShowAdminPanel(false); // Force re-render of user list
-              setTimeout(() => setShowAdminPanel(true), 0);
             }
+            setShowAdminPanel(false);
+            setShowAdminPanel(true);
           }}
+          onConfigUpdate={handlePaymentConfigUpdate} // Notify App of config change
         />
       )}
     </div>

@@ -7,9 +7,10 @@ interface AdminPanelProps {
   currentUser: User;
   onUpdateUser: (user: User) => void;
   onDeleteUser: (userId: string) => void;
+  onConfigUpdate: (config: PaymentConfig) => void; // New prop
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, currentUser, onUpdateUser, onDeleteUser }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, currentUser, onUpdateUser, onDeleteUser, onConfigUpdate }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig>(adminService.getPaymentConfig());
   const [editUserId, setEditUserId] = useState<string | null>(null);
@@ -63,8 +64,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, currentUser, onUpdateU
       return;
     }
     adminService.updatePaymentConfig(paymentConfig);
+    onConfigUpdate(paymentConfig); // Notify parent immediately
     setAdminError(null);
-    alert("支付配置已更新！");
+    alert("支付配置已更新！"); // Visual feedback
   };
 
   if (!currentUser.isAdmin) {
