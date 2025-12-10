@@ -8,12 +8,13 @@ import HistoryPanel from './components/HistoryPanel';
 import UnifiedImageDisplay from './components/UnifiedImageDisplay';
 import { editImage } from './services/geminiService';
 import { PromptTemplate, HistoryEntry, TemplateCategory, UploadedImage, User, PaymentConfig } from './types';
-import { authService } from './services/authService'; // New auth service
-import AuthModal from './components/AuthModal'; // New auth modal
-import LoginStatus from './components/LoginStatus'; // New login status component
-import PaymentModal from './components/PaymentModal'; // New payment modal
-import AdminPanel from './components/AdminPanel'; // New admin panel
-import { adminService } from './services/adminService'; // Import adminService for default payment config
+import { authService } from './services/authService';
+import AuthModal from './components/AuthModal';
+import LoginStatus from './components/LoginStatus';
+import PaymentModal from './components/PaymentModal';
+import AdminPanel from './components/AdminPanel';
+import { adminService } from './services/adminService';
+
 // Define prompt templates categorized
 const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
   {
@@ -543,7 +544,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
       {
         id: 'anime-character-transform',
         name: '真实人物转动漫角色',
-        description: '将图片中的真实人物（整体）转换为日本动漫风格的角色形象。',
+        description: '将图片中的真实人物（整体）转换为日本动漫风格的角色形象。保留人物的基本特征和神韵，但将其面部和身体比例卡通化，具有动漫人物的大眼睛、小嘴巴和流畅线条，使其看起来像二次元世界中的一员。',
         prompt: '请将图片中的真实人物（整体）转换为日本动漫风格的角色形象。保留人物的基本特征和神韵，但将其面部和身体比例卡通化，具有动漫人物的大眼睛、小嘴巴和流畅线条，使其看起来像二次元世界中的一员。',
       },
       {
@@ -1107,6 +1108,7 @@ const App: React.FC = () => {
     setCurrentUser(user);
     if (user) {
       setCredits(user.credits);
+      // Load user-specific history and templates
       const storedUserTemplates = localStorage.getItem(LOCAL_STORAGE_USER_TEMPLATES_KEY);
       if (storedUserTemplates) {
         setUserTemplates(JSON.parse(storedUserTemplates));
@@ -1120,9 +1122,8 @@ const App: React.FC = () => {
         setHistory([]);
       }
     } else {
-      // Guest user simulation
-      const currentConfig = adminService.getPaymentConfig();
-      setCredits(currentConfig.initialFreeCredits);
+      // Guest user logic: No credits for guests as requested
+      setCredits(0);
       setHistory([]);
       setUserTemplates([]);
       localStorage.removeItem(LOCAL_STORAGE_HISTORY_KEY);
@@ -1177,6 +1178,8 @@ const App: React.FC = () => {
     // Direct logout without confirmation dialog to prevent blocking issues
     authService.logout();
     setCurrentUser(null);
+    // Explicitly set credits to 0 for guest
+    setCredits(0);
     setEditedImageBase64(null);
     setAllUploadedImages([]);
     setActiveImageId(null);
@@ -1187,7 +1190,9 @@ const App: React.FC = () => {
 
   const handleUpdateCredits = useCallback(async (amount: number) => {
     if (!currentUser) {
-        setCredits(prev => prev + amount);
+        // Guests have 0 credits and can't use features, so this might not be reached ideally
+        // But for safety, just update local state if needed
+        setCredits(prev => Math.max(0, prev + amount));
         return;
     }
     const newCredits = currentUser.credits + amount;
@@ -1348,6 +1353,11 @@ const App: React.FC = () => {
     try {
       const result = await editImage(selectedImageBase64, selectedImageMimeType, prompt);
       if (result) {
+        // Increment user usage count
+        if (currentUser) {
+            authService.incrementUserUsage(currentUser.id);
+        }
+        
         handleUpdateCredits(-1);
         setEditedImageBase64(result);
         
@@ -1369,7 +1379,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [activeImage, selectedImageBase64, selectedImageMimeType, prompt, credits, selectedTemplateId, addToHistory, handleUpdateCredits]);
+  }, [activeImage, selectedImageBase64, selectedImageMimeType, prompt, credits, selectedTemplateId, addToHistory, handleUpdateCredits, currentUser]);
 
   const handleDownloadEditedImage = useCallback(() => {
     // Handled in UnifiedImageDisplay

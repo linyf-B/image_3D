@@ -40,12 +40,14 @@ export async function editImage(
     });
 
     // Iterate through all parts to find the image part, do not assume it is the first part.
+    // Also, remember that `part.text` is a property, not a method. Do not call `part.text()`.
     for (const candidate of response.candidates || []) {
       if (candidate.content) {
         for (const part of candidate.content.parts || []) {
           if (part.inlineData) {
             return part.inlineData.data;
           }
+          // Note: If we were looking for text, we would access `part.text` (property), NOT call `part.text()` (function).
         }
       }
     }

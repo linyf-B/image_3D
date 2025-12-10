@@ -7,7 +7,7 @@ interface AdminPanelProps {
   currentUser: User;
   onUpdateUser: (user: User) => void;
   onDeleteUser: (userId: string) => void;
-  onConfigUpdate: (config: PaymentConfig) => void; // New prop
+  onConfigUpdate: (config: PaymentConfig) => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, currentUser, onUpdateUser, onDeleteUser, onConfigUpdate }) => {
@@ -104,6 +104,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, currentUser, onUpdateU
                   <th className="py-2 px-4 border-b text-left text-sm font-medium text-gray-600">用户名</th>
                   <th className="py-2 px-4 border-b text-left text-sm font-medium text-gray-600">身份</th>
                   <th className="py-2 px-4 border-b text-left text-sm font-medium text-gray-600">积分</th>
+                  <th className="py-2 px-4 border-b text-left text-sm font-medium text-gray-600">调用次数</th>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-600">操作</th>
                 </tr>
               </thead>
@@ -124,6 +125,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, currentUser, onUpdateU
                         user.credits
                       )}
                     </td>
+                    <td className="py-2 px-4 text-sm text-gray-800">{user.usageCount || 0}</td>
                     <td className="py-2 px-4 text-center">
                       {editUserId === user.id ? (
                         <button

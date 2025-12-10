@@ -38,6 +38,7 @@ export interface User {
   password?: string; // Stored hashed in real app, plain for simulation
   isAdmin: boolean;
   credits: number;
+  usageCount: number; // New field for tracking API usage count
 }
 
 export interface AuthContextType {
@@ -52,5 +53,20 @@ export interface AuthContextType {
 export interface PaymentConfig {
   pricePerCredit: number; // e.g., 0.5 RMB
   initialFreeCredits: number; // e.g., 3
+}
+
+export enum PaymentStatus {
+  PENDING = 'pending',
+  SUCCESS = 'success',
+  FAILED = 'failed',
+}
+
+export interface PaymentOrder {
+  orderId: string;
+  amount: number;
+  credits: number;
+  status: PaymentStatus;
+  codeUrl: string; // The URL for the QR code
+  createdAt: number;
 }
 // --- End New types for Auth and Admin ---

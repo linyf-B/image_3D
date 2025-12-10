@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import { User } from '../types';
 
@@ -25,6 +26,7 @@ const seedAdminUser = () => {
       password: 'admin', // In a real app, this would be hashed
       isAdmin: true,
       credits: 99999, // Admin has unlimited credits
+      usageCount: 0,
     };
     users.push(adminUser);
     saveAllUsers(users);
@@ -42,6 +44,10 @@ export const authService = {
     const users = getAllUsers();
     const user = users.find(u => u.username === username && u.password === password); // In real app, compare hashed passwords
     if (user) {
+      // Ensure usageCount exists on login for legacy users
+      if (user.usageCount === undefined) {
+          user.usageCount = 0;
+      }
       localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(user));
       return user;
     }
@@ -53,12 +59,18 @@ export const authService = {
     if (users.some(u => u.username === username)) {
       return null; // Username already exists
     }
+    // Note: We'd normally import defaultPaymentConfig here or get from adminService, 
+    // but for simplicity in this simulated service, we default to 3 if not managed elsewhere.
+    // In App.tsx, we sync with admin settings for guests, but here hardcoding 3 for registration 
+    // fallback or fetch from admin service if circular deps allow. 
+    // To match AdminService defaults without circular dep, we assume 3 here or update later.
     const newUser: User = {
       id: uuidv4(),
       username,
       password, // In a real app, this would be hashed
       isAdmin: false,
       credits: 3, // Default 3 free credits for new users
+      usageCount: 0, // Initialize usage count to 0
     };
     users.push(newUser);
     saveAllUsers(users);
@@ -79,7 +91,27 @@ export const authService = {
       // If the updated user is the current logged-in user, update localStorage for current user too
       const currentUser = authService.getCurrentUser();
       if (currentUser && currentUser.id === userId) {
-        localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(users[userIndex]));
+        // Preserve other fields
+        const updatedUser = { ...currentUser, credits: newCredits };
+        localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedUser));
+      }
+    }
+  },
+
+  incrementUserUsage: async (userId: string): Promise<void> => {
+    const users = getAllUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex !== -1) {
+      // Initialize usageCount if undefined (for legacy data), then increment
+      const currentUsage = users[userIndex].usageCount || 0;
+      users[userIndex].usageCount = currentUsage + 1;
+      saveAllUsers(users);
+      
+      // Update current user session if it matches
+      const currentUser = authService.getCurrentUser();
+      if (currentUser && currentUser.id === userId) {
+        const updatedUser = { ...currentUser, usageCount: users[userIndex].usageCount };
+        localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(updatedUser));
       }
     }
   },
