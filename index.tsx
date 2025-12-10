@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+// Import App as a default export
 import App from './App';
 
 const rootElement = document.getElementById('root');

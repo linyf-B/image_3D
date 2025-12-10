@@ -1,27 +1,29 @@
-
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { BlendMode } from '../types';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { UploadedImage } from '../types';
 
 interface UnifiedImageDisplayProps {
-  selectedImageBase64: string | null;
-  selectedImageMimeType: string | null;
+  allUploadedImages: UploadedImage[]; // All images uploaded by the user
+  activeImageId: string | null; // ID of the currently active image for editing
   editedImageBase64: string | null;
-  onImageSelect: (base64: string, mimeType: string) => void;
-  onClearImage: () => void;
+  onImageSelect: (newImages: UploadedImage[], selectedId?: string) => void; // Now handles multiple images and setting active
+  onClearImage: (imageIdToClear?: string) => void; // Clears a specific image or all
   onDownloadEditedImage: () => void;
-  onMergeRequest: () => void; // Callback to open merge modal
+  onMergeRequest: () => void; // Callback to open merge modal (now removed)
   isLoading: boolean;
+  setActiveImageId: (id: string | null) => void; // To change active image from parent
 }
 
 const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
-  selectedImageBase64,
-  selectedImageMimeType,
+  allUploadedImages,
+  activeImageId,
   editedImageBase64,
   onImageSelect,
   onClearImage,
   onDownloadEditedImage,
-  onMergeRequest,
+  onMergeRequest, // Still required for prop type, but its implementation removed
   isLoading,
+  setActiveImageId,
 }) => {
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -33,14 +35,18 @@ const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
 
   const [showOriginalForComparison, setShowOriginalForComparison] = useState<boolean>(false);
 
-  // Determine which image to display based on state
+  const activeImage = useMemo(() => {
+    return allUploadedImages.find(img => img.id === activeImageId) || null;
+  }, [allUploadedImages, activeImageId]);
+
+  // Determine which image to display in the main view
   const displayImageBase64 = editedImageBase64 && !showOriginalForComparison
     ? editedImageBase64 // If edited exists and not showing original, show edited
-    : selectedImageBase64; // Otherwise, show original (either by default or if edited is null)
+    : activeImage?.base64 || null; // Otherwise, show active original image
 
   const displayImageMimeType = editedImageBase64 && !showOriginalForComparison
     ? 'image/png' // Assuming edited output is PNG
-    : selectedImageMimeType; // Use original MIME type for original image
+    : activeImage?.mimeType || null; // Use original MIME type for active original image
 
   const resetZoomAndPan = useCallback(() => {
     setZoomLevel(1);
@@ -50,12 +56,12 @@ const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
 
   // Effect to manage comparison toggle and reset zoom/pan
   useEffect(() => {
-    if (selectedImageBase64) {
+    if (activeImage) {
       if (editedImageBase64) {
-        // If both original and edited exist, default to showing edited result.
+        // If both original (active) and edited exist, default to showing edited result.
         setShowOriginalForComparison(false);
       } else {
-        // If only original exists (just uploaded, or edited was cleared), show original.
+        // If only original (active) exists (just uploaded, or edited was cleared), show original.
         setShowOriginalForComparison(true);
       }
     } else {
@@ -63,22 +69,42 @@ const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
       setShowOriginalForComparison(false);
     }
     resetZoomAndPan(); // Always reset zoom/pan when core image states change
-  }, [selectedImageBase64, editedImageBase64, resetZoomAndPan]);
+  }, [activeImage, editedImageBase64, resetZoomAndPan]);
 
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        const [meta, base64Data] = base64String.split(',');
-        const mimeType = meta.match(/:(.*?);/)?.[1] || file.type;
-        onImageSelect(base64Data, mimeType);
-        event.target.value = ''; // Clear the input value
-      };
-      reader.readAsDataURL(file);
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    // Explicitly cast to File[] to avoid 'unknown' type inference issues with Array.from on FileList
+    const files = Array.from(event.target.files || []) as File[];
+    if (files.length > 0) {
+      const newImagesPromises = files.map(file => {
+        return new Promise<UploadedImage>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64String = reader.result as string;
+            const [meta, base64Data] = base64String.split(',');
+            const mimeType = meta.match(/:(.*?);/)?.[1] || file.type;
+            resolve({
+              id: uuidv4(),
+              base64: base64Data,
+              mimeType: mimeType,
+              fileName: file.name,
+            });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      });
+
+      try {
+        const newUploadedImages = await Promise.all(newImagesPromises);
+        const updatedAllImages = [...allUploadedImages, ...newUploadedImages];
+        onImageSelect(updatedAllImages, newUploadedImages[0].id); // Pass all images and set first new one as active
+      } catch (error) {
+        console.error("Error reading files:", error);
+        // Optionally, show an error message to the user
+      }
     }
+    event.target.value = ''; // Clear the input value
   };
 
   const handleZoom = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
@@ -166,18 +192,7 @@ const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
               cursor: isDragging ? 'grabbing' : (zoomLevel > 1 ? 'grab' : 'default'),
             }}
           />
-          {/* Merge button only on edited image when it's the current display */}
-          {!showOriginalForComparison && editedImageBase64 && (
-            <button
-              onClick={onMergeRequest}
-              className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 text-white text-5xl opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-md"
-              aria-label="叠加图片"
-              title="点击叠加另一张图片"
-              disabled={isLoading}
-            >
-              +
-            </button>
-          )}
+          {/* Merge button functionality removed */}
         </>
       ) : (
         <label htmlFor="file-upload" className="cursor-pointer w-full h-full flex flex-col items-center justify-center p-4">
@@ -185,6 +200,7 @@ const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
             id="file-upload"
             type="file"
             accept="image/*"
+            multiple // Allow multiple file selection
             onChange={handleFileChange}
             className="hidden"
             disabled={isLoading}
@@ -204,16 +220,16 @@ const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
 
   return (
     <div className="flex flex-col gap-4 w-full">
-      {/* Image Uploader / Display */}
+      {/* Main Image Uploader / Display */}
       {ImageDisplayContent}
 
       {/* Control buttons when image is present */}
-      {selectedImageBase64 && (
+      {activeImage && (
         <div className="flex flex-col gap-2 p-4 bg-gray-50 rounded-lg shadow-md border border-gray-200">
-          <div className="flex justify-center gap-2 mb-2">
+          <div className="flex flex-wrap justify-center gap-2"> {/* Consolidated buttons into one row */}
             <button
               onClick={() => setShowOriginalForComparison(true)}
-              disabled={!selectedImageBase64 || isLoading}
+              disabled={isLoading}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 showOriginalForComparison
                   ? 'bg-blue-600 text-white'
@@ -233,16 +249,13 @@ const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
             >
               查看编辑结果
             </button>
-          </div>
-
-          <div className="flex justify-center gap-2">
             <button
-              onClick={onClearImage}
+              onClick={() => onClearImage(activeImage.id)} // Clear only the active image
               className="py-2 px-4 bg-red-500 text-white font-semibold rounded-md hover:bg-red-600 transition-colors disabled:bg-red-300 text-sm"
               disabled={isLoading}
               aria-label="清除当前图片"
             >
-              清除图片
+              清除当前图片
             </button>
             <button
               onClick={resetZoomAndPan}
@@ -262,6 +275,42 @@ const UnifiedImageDisplay: React.FC<UnifiedImageDisplayProps> = ({
                 下载
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Thumbnail Gallery for Multiple Uploaded Images */}
+      {allUploadedImages.length > 0 && (
+        <div className="w-full overflow-x-auto whitespace-nowrap py-2 pr-2 -mr-2 scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-blue-100">
+          <div className="inline-flex gap-2">
+            {allUploadedImages.map((img) => (
+              <div
+                key={img.id}
+                className={`relative group inline-block w-24 h-24 flex-shrink-0 rounded-md border-2 transition-all duration-200
+                  ${img.id === activeImageId ? 'border-blue-500 ring-2 ring-blue-500 shadow-md' : 'border-gray-300 hover:border-blue-300'}
+                `}
+              >
+                <img
+                  src={`data:${img.mimeType};base64,${img.base64}`}
+                  alt={img.fileName}
+                  className="w-full h-full object-cover rounded-md cursor-pointer"
+                  onClick={() => setActiveImageId(img.id)}
+                  title={img.fileName}
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent activating image when deleting
+                    onClearImage(img.id);
+                  }}
+                  className="absolute top-0 right-0 bg-red-500 text-white rounded-full h-5 w-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  aria-label={`删除图片: ${img.fileName}`}
+                  title="删除图片"
+                  disabled={isLoading}
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}

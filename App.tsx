@@ -1,16 +1,19 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { v4 as uuidv4 } from 'uuid';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorMessage from './components/ErrorMessage';
 import PromptTemplateSelector from './components/PromptTemplateSelector';
 import AddTemplateModal from './components/AddTemplateModal';
 import HistoryPanel from './components/HistoryPanel';
-import PromptSuggestions from './components/PromptSuggestions';
-import UnifiedImageDisplay from './components/UnifiedImageDisplay'; // New unified image component
-import MergeImageModal from './components/MergeImageModal'; // New merge image modal
-import { editImage, getPromptSuggestions } from './services/geminiService';
-import { PromptTemplate, HistoryEntry, TemplateCategory, BlendMode } from './types';
-import { mergeImagesWithBlendMode } from './utils/imageProcessor';
+import UnifiedImageDisplay from './components/UnifiedImageDisplay';
+import { editImage } from './services/geminiService';
+import { PromptTemplate, HistoryEntry, TemplateCategory, UploadedImage, User } from './types';
+import { authService } from './services/authService'; // New auth service
+import AuthModal from './components/AuthModal'; // New auth modal
+import LoginStatus from './components/LoginStatus'; // New login status component
+import PaymentModal from './components/PaymentModal'; // New payment modal
+import AdminPanel from './components/AdminPanel'; // New admin panel
+import { adminService } from './services/adminService'; // Import adminService for default payment config
 
 // Define prompt templates categorized
 const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
@@ -20,10 +23,16 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
     description: '专业证件照编辑，包括背景更换、尺寸调整、面部优化等。',
     templates: [
       {
-        id: 'id-photo-face-cutout-generate',
-        name: '抠面部生成证件照',
+        id: 'id-photo-face-cutout-generate-formal',
+        name: '抠面部生成正式证件照',
         description: '从图片中智能识别并抠取面部，生成一张用于入职等正式场合的专业证件照。',
         prompt: '请从用户上传的图片中智能识别并精确抠取人物面部信息，在此基础上生成一张符合入职等正式场合的专业证件照。确保面部表情端庄自然，眼神有神。自动添加标准纯白色背景（RGB: 255,255,255），并智能匹配一套合适的深色商务正装（如西装、衬衫），使其与脸部光影自然融合。证件照尺寸应符合通用二寸标准（3.5cm x 4.9cm），头部占据画面约2/3，整体效果专业得体。',
+      },
+      {
+        id: 'id-photo-face-cutout-generate-qversion',
+        name: '抠面部生成Q版证件照',
+        description: '从图片中智能识别并抠取面部，生成一张可爱Q版的证件照。',
+        prompt: '请从用户上传的图片中智能识别并精确抠取人物面部信息，在此基础上生成一张可爱Q版风格的证件照。面部特征应被卡通化，眼睛大而圆，表情俏皮。背景替换为淡蓝色或淡粉色，并智能搭配一套可爱的卡通服装。整体风格活泼有趣，适合非正式场合。',
       },
       {
         id: 'id-photo-bg-change-blue',
@@ -240,7 +249,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         id: 'figurine-transparent',
         name: '半透明化',
         description: '将手办的主体变为半透明材质。',
-        prompt: '请将图片中手办的主体材质转换为晶莹剔透的半透明玻璃或水晶质感。确保能够透过手办看到背景的折射效果，同时保留其轮廓和色彩的反射效果，使其看起来轻盈而神秘，仿佛幽灵般的存在。',
+        prompt: '请将图片中手办的主体材质转换为晶莹剔透的半透明玻璃或水晶质感。确保能够通过手办看到背景的折射效果，同时保留其轮廓和色彩的反射效果，使其看起来轻盈而神秘，仿佛幽灵般的存在。',
       },
       {
         id: 'figurine-close-up',
@@ -277,6 +286,24 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         name: '全息投影手办',
         description: '将手办转变为未来感全息投影效果。',
         prompt: '请将图片中的手办主体转换为一个半透明、泛着蓝色或青绿色光芒的全息投影形象。使其边缘带有轻微的像素抖动和扫描线效果，周围散发着科技感的光晕，背景可为暗色，以突出全息效果。',
+      },
+      {
+        id: 'figurine-add-effects-smoke',
+        name: '添加烟雾特效',
+        description: '为手办添加神秘的烟雾或蒸汽效果。',
+        prompt: '请在图片中手办的周围添加一层轻柔、神秘的烟雾或蒸汽效果。烟雾应呈半透明状，颜色可为淡蓝或白色，围绕手办底部或从其身体某处散发，营造出梦幻或紧张的氛围。',
+      },
+      {
+        id: 'figurine-add-stand-glowing',
+        name: '添加发光底座',
+        description: '为手办添加一个内部发光的展示底座。',
+        prompt: '请为图片中的手办添加一个内部发光的圆形透明底座。底座发出柔和的蓝色或白色光芒，向上照亮手办底部，使其看起来更加精致和高级。',
+      },
+      {
+        id: 'figurine-weather-rain',
+        name: '手办置于雨中',
+        description: '将手办置于下雨场景。',
+        prompt: '请将图片中的手办主体保留，将其背景替换为一个下着细雨的夜晚场景。手办表面应有雨水打湿的反光效果，背景虚化，地面有水面倒影，营造出潮湿、感性的雨夜氛围。',
       },
     ],
   },
@@ -445,7 +472,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
       {
         id: 'anime-pixel-art',
         name: '转像素艺术风格',
-        description: '将图片转换为复古像素画风格。',
+        description: '将图片（整体）转换为复古像素画风格。',
         prompt: '请将图片（整体人物和背景）转换为复古的像素艺术（Pixel Art）风格。画面应由清晰可见的方块像素组成，色彩数量受限，边缘锐利，仿佛是80年代或90年代的电子游戏画面，充满怀旧感和独特的数字美学。',
       },
       {
@@ -499,7 +526,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
       {
         id: 'anime-character-transform',
         name: '真实人物转动漫角色',
-        description: '将真实人物转换为动漫角色形象。',
+        description: '将图片中的真实人物（整体）转换为日本动漫风格的角色形象。保留人物的基本特征和神韵，但将其面部和身体比例卡通化，具有动漫人物的大眼睛、小嘴巴和流畅线条，使其看起来像二次元世界中的一员。',
         prompt: '请将图片中的真实人物（整体）转换为日本动漫风格的角色形象。保留人物的基本特征和神韵，但将其面部和身体比例卡通化，具有动漫人物的大眼睛、小嘴巴和流畅线条，使其看起来像二次元世界中的一员。',
       },
       {
@@ -512,7 +539,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         id: 'anime-effect-speed-lines',
         name: '添加动漫速度线',
         description: '为图片添加动漫中的速度线，增加动感。',
-        prompt: '请在图片中的主体周围智能添加动漫风格的速度线（Speed Lines）或冲击线（Impact Lines），以突出其快速移动或受到冲击的效果。线条应简洁有力，与主体动作方向一致，增强画面的动感和视觉张力。',
+        prompt: '请在图片中的主体周围智能添加动漫风格的速度线（Speed Lines）或冲击线（Impact Lines），以突出其快速移动或受到冲击的效果。特效应具有动漫风格的动感和冲击力，光影变化自然，使人物看起来像在快速奔跑或遭受攻击。',
       },
       {
         id: 'anime-background-cherry-blossom',
@@ -681,7 +708,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
       {
         id: 'filter-cinematic',
         name: '电影感色彩分级',
-        description: '为图片添加电影级的色彩分级和光影效果，营造史诗感。',
+        description: '为图片应用电影级的色彩分级和光影效果，营造史诗感。',
         prompt: '请为图片（整体）应用电影级的色彩分级（Color Grading），调整对比度、饱和度和色调，使其具有宽银幕电影的深邃感和戏剧性光影效果。特别是暗部应呈现蓝绿色调，亮部偏暖，营造出磅礴大气、富有叙事感的史诗大片般质感。',
       },
       {
@@ -759,7 +786,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
       {
         id: 'filter-pop-art',
         name: '波普艺术风格',
-        description: '将图片转换为色彩鲜明的波普艺术风格。',
+        description: '将图片（整体）转换为色彩鲜明的波普艺术风格。',
         prompt: '请将图片（整体）转换为安迪·沃霍尔（Andy Warhol）式的波普艺术风格。画面应具有大胆的撞色、重复的图案和鲜艳饱和的色彩，边缘线条清晰，如同印刷品般的视觉效果，充满现代艺术的活力和叛逆。',
       },
       {
@@ -784,7 +811,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
         id: 'filter-sepia',
         name: '褐色复古（Sepia）滤镜',
         description: '为图片添加温暖的褐色调复古效果。',
-        prompt: '请为图片（整体）添加温暖的褐色调（Sepia）复古滤镜。画面色彩将转换为具有历史感的棕褐色，对比度适中，仿佛一张年代久远的旧照片，充满怀旧与典雅的气息。',
+        prompt: '请为图片（整体）添加温暖的褐色调（Sepia）复古滤镜。画面色彩将转换为具有历史感的棕褐色，对比度适中，仿佛一张年代久远的老照片，充满怀旧与典雅的气息。',
       },
       {
         id: 'filter-HDR',
@@ -910,7 +937,7 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
       {
         id: 'rotate-image-90',
         name: '图片旋转90度',
-        description: '将图片顺时针旋转90度。',
+        description: '将图片内容进行顺时针90度旋转。',
         prompt: '请将图片内容进行顺时针90度旋转。确保旋转后画面完整，不裁剪任何内容，并自动调整画布以适应新的尺寸。',
       },
       {
@@ -924,14 +951,30 @@ const INITIAL_CATEGORIZED_TEMPLATES: TemplateCategory[] = [
 ];
 
 
-const LOCAL_STORAGE_HISTORY_KEY = 'imageEditorHistory';
-const LOCAL_STORAGE_USER_TEMPLATES_KEY = 'imageEditorUserTemplates';
+const LOCAL_STORAGE_HISTORY_KEY = 'aiImageEditorHistory';
+const LOCAL_STORAGE_USER_TEMPLATES_KEY = 'aiImageEditorUserTemplates';
+// Admin user is seeded by authService, default payment config is also handled by authService via User credits.
 
+// Add export default to the App component
 const App: React.FC = () => {
-  // Image states are now managed within UnifiedImageDisplay, but App needs a copy to pass to services/history
-  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
-  const [selectedImageMimeType, setSelectedImageMimeType] = useState<string | null>(null);
-  const [editedImageBase64, setEditedImageBase64] = useState<string | null>(null); // This is the AI-generated or merged result
+  // --- Auth States ---
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login'); // 'login' or 'register'
+
+  // --- Image management states for multiple uploads ---
+  const [allUploadedImages, setAllUploadedImages] = useState<UploadedImage[]>([]);
+  const [activeImageId, setActiveImageId] = useState<string | null>(null);
+
+  const activeImage = useMemo(() => {
+    return allUploadedImages.find(img => img.id === activeImageId) || null;
+  }, [allUploadedImages, activeImageId]);
+
+  const selectedImageBase64 = activeImage?.base64 || null;
+  const selectedImageMimeType = activeImage?.mimeType || null;
+  // --- End: Image management states ---
+
+  const [editedImageBase64, setEditedImageBase64] = useState<string | null>(null); // This is the AI-generated result
 
   const [prompt, setPrompt] = useState<string>(''); // User's typed prompt
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -943,136 +986,207 @@ const App: React.FC = () => {
   const [showAddTemplateModal, setShowAddTemplateModal] = useState<boolean>(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  // States for AI prompt suggestions
-  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
-  const [isSuggesting, setIsSuggesting] = useState<boolean>(false);
-  const [suggestionError, setSuggestionError] = useState<string | null>(null);
-  const suggestionTimeoutRef = useRef<number | null>(null); // For debouncing
+  // Removed states for AI prompt suggestions
 
   // New state for template categorization
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | null>(null);
 
-  // Credits for payment feature hint
-  const [credits, setCredits] = useState<number>(100);
+  // Credits for payment feature hint, linked to currentUser
+  const [credits, setCredits] = useState<number>(0); // Initialize with 0, load from authService
 
-  // State for image merging modal
-  const [showMergeImageModal, setShowMergeImageModal] = useState<boolean>(false);
+  // State for payment modal
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
 
-  // Load user templates and history from local storage on mount
-  useEffect(() => {
-    try {
+  // State for Admin panel
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+
+  // --- Auth related effects and callbacks ---
+  const loadCurrentUserState = useCallback(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+    if (user) {
+      setCredits(user.credits);
+      // Load user-specific history and templates
+      // In a real app, these would be fetched from a backend tied to currentUser.id.
+      // For this simulation, we're using localStorage, but clearing if no user.
       const storedUserTemplates = localStorage.getItem(LOCAL_STORAGE_USER_TEMPLATES_KEY);
       if (storedUserTemplates) {
         setUserTemplates(JSON.parse(storedUserTemplates));
+      } else {
+        setUserTemplates([]);
       }
       const storedHistory = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
       if (storedHistory) {
         setHistory(JSON.parse(storedHistory));
+      } else {
+        setHistory([]);
       }
-    } catch (e) {
-      console.error("Failed to load data from localStorage", e);
-      // Optionally clear corrupted data or notify user
+    } else {
+      // Guest user simulation: provide initial credits, clear personal data
+      const paymentConfig = adminService.getPaymentConfig(); // Get initial credits from config
+      setCredits(paymentConfig.initialFreeCredits);
+      setHistory([]);
+      setUserTemplates([]);
+      localStorage.removeItem(LOCAL_STORAGE_HISTORY_KEY);
+      localStorage.removeItem(LOCAL_STORAGE_USER_TEMPLATES_KEY);
     }
+    // Also clear image states when user changes (e.g., guest to logged in, or logged out)
+    setEditedImageBase64(null);
+    setAllUploadedImages([]);
+    setActiveImageId(null);
+    setPrompt('');
+    setSelectedTemplateId(null);
+    setSelectedCategory(null);
+    setError(null);
   }, []);
+
+  useEffect(() => {
+    loadCurrentUserState();
+  }, [loadCurrentUserState]);
+
+
+  const handleLogin = useCallback(async (username: string, password: string): Promise<boolean> => {
+    const user = await authService.login(username, password);
+    if (user) {
+      setCurrentUser(user);
+      setCredits(user.credits);
+      setShowAuthModal(false);
+      setError(null);
+      loadCurrentUserState(); // Explicitly reload all user states including history/templates
+      return true;
+    } else {
+      setError("登录失败，请检查用户名或密码。");
+      return false;
+    }
+  }, [loadCurrentUserState]);
+
+  const handleRegister = useCallback(async (username: string, password: string): Promise<boolean> => {
+    const user = await authService.register(username, password);
+    if (user) {
+      setCurrentUser(user);
+      setCredits(user.credits);
+      setShowAuthModal(false);
+      setError(null);
+      loadCurrentUserState(); // Explicitly reload all user states including history/templates
+      return true;
+    } else {
+      setError("注册失败，用户名可能已占用。");
+      return false;
+    }
+  }, [loadCurrentUserState]);
+
+  const handleLogout = useCallback(() => {
+    if (window.confirm("确定要退出登录吗？")) {
+      authService.logout();
+      // Reset App state to non-logged-in/guest state
+      setCurrentUser(null);
+      setEditedImageBase64(null); // Clear edited image
+      setAllUploadedImages([]); // Clear uploaded images
+      setActiveImageId(null);
+      setShowAdminPanel(false); // Close admin panel on logout
+      setError(null);
+      loadCurrentUserState(); // Explicitly reload state after logout to ensure consistency
+    }
+  }, [loadCurrentUserState]);
+
+  const handleUpdateCredits = useCallback(async (amount: number) => {
+    if (!currentUser) {
+        setCredits(prev => prev + amount); // Update guest credits directly for simulation
+        // No persistence for guest credits beyond current session in this simple simulation
+        return;
+    }
+    const newCredits = currentUser.credits + amount;
+    await authService.updateUserCredits(currentUser.id, newCredits);
+    setCurrentUser(prevUser => prevUser ? { ...prevUser, credits: newCredits } : null);
+    setCredits(newCredits);
+  }, [currentUser]);
 
   // Save user templates to local storage whenever they change
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_USER_TEMPLATES_KEY, JSON.stringify(userTemplates));
+      // In a real app, user templates would be saved to a backend tied to currentUser.id
+      if (currentUser) { // Only save if a user is logged in
+        localStorage.setItem(LOCAL_STORAGE_USER_TEMPLATES_KEY, JSON.stringify(userTemplates));
+      } else if (userTemplates.length === 0 && localStorage.getItem(LOCAL_STORAGE_USER_TEMPLATES_KEY) !== null) { // If guest, and templates are cleared, remove from storage
+        localStorage.removeItem(LOCAL_STORAGE_USER_TEMPLATES_KEY);
+      }
     } catch (e) {
       console.error("Failed to save user templates to localStorage", e);
     }
-  }, [userTemplates]);
+  }, [userTemplates, currentUser]);
 
   // Save history to local storage whenever it changes
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(history));
+      // In a real app, history would be saved to a backend tied to currentUser.id
+      if (currentUser) { // Only save if a user is logged in
+        localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(history));
+      } else if (history.length === 0 && localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY) !== null) { // If guest, and history is cleared, remove from storage
+        localStorage.removeItem(LOCAL_STORAGE_HISTORY_KEY);
+      }
     } catch (e) {
       console.error("Failed to save history to localStorage", e);
     }
-  }, [history]);
+  }, [history, currentUser]);
 
-  // Flatten all templates (categorized and user-defined) for searching and suggestions
+  // Flatten all templates (categorized and user-defined) for searching
   const allTemplates = useMemo(() => {
     const categorizedFlatTemplates = INITIAL_CATEGORIZED_TEMPLATES.flatMap(cat => cat.templates);
     return [...categorizedFlatTemplates, ...userTemplates];
   }, [userTemplates]);
 
-  // Debounced AI prompt suggestion logic
-  useEffect(() => {
-    if (suggestionTimeoutRef.current) {
-      clearTimeout(suggestionTimeoutRef.current);
-    }
 
-    if (prompt.trim().length > 5 && !isLoading) { // Only suggest if prompt has some length and not actively loading
-      setIsSuggesting(true);
-      setSuggestionError(null);
-      setAiSuggestions([]); // Clear previous suggestions
-
-      suggestionTimeoutRef.current = window.setTimeout(async () => {
-        try {
-          const selectedTemplate = allTemplates.find(t => t.id === selectedTemplateId);
-          const suggestions = await getPromptSuggestions(prompt, selectedTemplate?.description);
-          setAiSuggestions(suggestions);
-        } catch (e: unknown) {
-          if (e instanceof Error) {
-            setSuggestionError(e.message);
-          } else {
-            setSuggestionError("获取提示词建议时发生未知错误。");
-          }
-          setAiSuggestions([]);
-        } finally {
-          setIsSuggesting(false);
-        }
-      }, 700); // Debounce for 700ms
+  // --- Start: Modified handleImageSelect to support multiple images ---
+  const handleImageSelect = useCallback((newImages: UploadedImage[], selectedId?: string) => {
+    setAllUploadedImages(newImages);
+    if (newImages.length > 0) {
+      setActiveImageId(selectedId || newImages[0].id);
     } else {
-      setIsSuggesting(false);
-      setAiSuggestions([]);
-      setSuggestionError(null);
+      setActiveImageId(null);
     }
-
-    return () => {
-      if (suggestionTimeoutRef.current) {
-        clearTimeout(suggestionTimeoutRef.current);
-      }
-    };
-  }, [prompt, selectedTemplateId, allTemplates, isLoading]); // Dependencies for suggestion effect
-
-
-  const handleImageSelect = useCallback((base64: string, mimeType: string) => {
-    setSelectedImageBase64(base64);
-    setSelectedImageMimeType(mimeType);
     setEditedImageBase64(null); // Clear previous edited image
     setError(null);
     setPrompt('');
     setSelectedTemplateId(null);
     setSelectedCategory(null); // Clear category selection on new image
-    setAiSuggestions([]); // Clear suggestions
-    setSuggestionError(null);
     if (promptInputRef.current) {
       promptInputRef.current.focus();
     }
   }, []);
+  // --- End: Modified handleImageSelect ---
 
-  const handleClearImage = useCallback(() => {
-    setSelectedImageBase64(null);
-    setSelectedImageMimeType(null);
-    setEditedImageBase64(null);
+  // --- Start: Modified handleClearImage to handle active image or all images ---
+  const handleClearImage = useCallback((imageIdToClear?: string) => {
+    if (imageIdToClear) {
+      // Clear a specific image
+      setAllUploadedImages(prevImages => {
+        const remainingImages = prevImages.filter(img => img.id !== imageIdToClear);
+        if (activeImageId === imageIdToClear) {
+          // If the active image is cleared, set the next one as active or clear activeId
+          setActiveImageId(remainingImages.length > 0 ? remainingImages[0].id : null);
+          setEditedImageBase64(null); // Clear edited result if active image changes
+        }
+        return remainingImages;
+      });
+    } else {
+      // Clear all images (original functionality)
+      setAllUploadedImages([]);
+      setActiveImageId(null);
+      setEditedImageBase64(null);
+    }
+
     setError(null);
     setPrompt('');
     setSelectedTemplateId(null);
     setSelectedCategory(null); // Clear category selection
-    setAiSuggestions([]); // Clear suggestions
-    setSuggestionError(null);
-  }, []);
+  }, [activeImageId]);
+  // --- End: Modified handleClearImage ---
+
 
   const handleSelectTemplate = useCallback((template: PromptTemplate) => {
     setPrompt(template.prompt);
     setSelectedTemplateId(template.id);
     setError(null);
-    setAiSuggestions([]); // Clear suggestions when template is selected
-    setSuggestionError(null);
     if (promptInputRef.current) {
       promptInputRef.current.focus();
     }
@@ -1081,8 +1195,6 @@ const App: React.FC = () => {
   const handleClearTemplate = useCallback(() => {
     setPrompt('');
     setSelectedTemplateId(null);
-    setAiSuggestions([]); // Clear suggestions
-    setSuggestionError(null);
     if (promptInputRef.current) {
       promptInputRef.current.focus();
     }
@@ -1137,6 +1249,7 @@ const App: React.FC = () => {
     }
     if (credits <= 0) {
       setError("您的积分不足，请充值。");
+      setShowPaymentModal(true); // Show payment modal if credits are 0
       return;
     }
     
@@ -1145,10 +1258,17 @@ const App: React.FC = () => {
     try {
       const result = await editImage(selectedImageBase64, selectedImageMimeType, prompt);
       if (result) {
+        // Deduct credit on successful generation
+        handleUpdateCredits(-1);
         setEditedImageBase64(result);
-        setCredits((prev) => prev - 1); // Deduct credit on successful generation
         
-        addToHistory(selectedImageBase64, selectedImageMimeType, result, prompt, selectedTemplateId);
+        // Use activeImage's base64/mimeType for history, not selectedImageBase64 (which might be null after an intermediate clear)
+        if (activeImage) {
+            addToHistory(activeImage.base64, activeImage.mimeType, result, prompt, selectedTemplateId);
+        } else {
+            // Fallback, though activeImage should exist if selectedImageBase64 exists
+            addToHistory(selectedImageBase64, selectedImageMimeType, result, prompt, selectedTemplateId);
+        }
 
       } else {
         setError("未返回编辑后的图片。请尝试不同的提示词。");
@@ -1162,7 +1282,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedImageBase64, selectedImageMimeType, prompt, credits, selectedTemplateId, addToHistory]);
+  }, [activeImage, selectedImageBase64, selectedImageMimeType, prompt, credits, selectedTemplateId, addToHistory, handleUpdateCredits]);
 
   const handleDownloadEditedImage = useCallback(() => {
     // This function is now passed to UnifiedImageDisplay
@@ -1171,13 +1291,11 @@ const App: React.FC = () => {
 
   const handleClearCurrentSession = useCallback(() => {
     if (window.confirm("确定要清空当前会话中的图片和提示词吗？此操作不可撤销。")) {
-      handleClearImage(); // Clears all image states
+      handleClearImage(); // Clears all image states, including all uploaded images
       setPrompt('');
       setSelectedTemplateId(null);
       setSelectedCategory(null);
       setError(null);
-      setAiSuggestions([]);
-      setSuggestionError(null);
       if (promptInputRef.current) {
         promptInputRef.current.focus();
       }
@@ -1185,16 +1303,22 @@ const App: React.FC = () => {
   }, [handleClearImage]);
 
   const handleLoadHistoryItem = useCallback((entry: HistoryEntry) => {
-    setSelectedImageBase64(entry.originalImageBase64);
-    setSelectedImageMimeType(entry.originalImageMimeType);
+    // When loading from history, we set the original image as the *only* uploaded image
+    const historyImage: UploadedImage = {
+        id: uuidv4(),
+        base64: entry.originalImageBase64,
+        mimeType: entry.originalImageMimeType,
+        fileName: 'history_original.png' // Generic name
+    };
+    setAllUploadedImages([historyImage]);
+    setActiveImageId(historyImage.id);
+
     setEditedImageBase64(entry.editedImageBase64);
     setPrompt(entry.prompt);
     // When loading from history, clear template/category selection as it's a specific prompt
     setSelectedTemplateId(null);
     setSelectedCategory(null);
     setError(null);
-    setAiSuggestions([]);
-    setSuggestionError(null);
     if (promptInputRef.current) {
       promptInputRef.current.focus();
     }
@@ -1204,58 +1328,19 @@ const App: React.FC = () => {
     setHistory((prevHistory) => prevHistory.filter(entry => entry.id !== idToDelete));
   }, []);
 
-  const handleSelectSuggestion = useCallback((suggestion: string) => {
-    setPrompt((prevPrompt) => (prevPrompt.trim() + ' ' + suggestion).trim());
-    setAiSuggestions([]); // Clear suggestions after one is selected
-    setSuggestionError(null);
-    if (promptInputRef.current) {
-      promptInputRef.current.focus();
-    }
-  }, []);
-
-  const handleMergeImages = useCallback(async (overlayImageBase64: string, overlayImageMimeType: string, blendMode: BlendMode, opacity: number) => {
-    if (!editedImageBase64) {
-      setError("没有当前的编辑结果图片可供叠加。");
-      return;
-    }
-    if (credits <= 0) {
-      setError("您的积分不足，无法进行叠加操作。");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Assuming editedImageBase64 is always image/png from Gemini output
-      const mergedImage = await mergeImagesWithBlendMode(
-        editedImageBase64, 'image/png', // Base image is current edited result
-        overlayImageBase64, overlayImageMimeType, // Overlay image from user upload
-        blendMode, opacity
-      );
-      setEditedImageBase64(mergedImage);
-      setCredits((prev) => prev - 1); // Deduct credit for merge operation
-      setShowMergeImageModal(false);
-
-      // Add merge operation to history
-      addToHistory(selectedImageBase64!, selectedImageMimeType!, mergedImage, `图片叠加: ${blendMode} (${(opacity * 100).toFixed(0)}%)`, 'merge-operation');
-
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(`图片叠加失败: ${e.message}`);
-      } else {
-        setError("图片叠加时发生未知错误。");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [editedImageBase64, credits, selectedImageBase64, selectedImageMimeType, addToHistory]);
-
   const canEdit = !isLoading && selectedImageBase64 && prompt.trim() && credits > 0;
 
   return (
     <div className="flex h-full w-full p-4 gap-4"> {/* Outer container, full screen, with padding and gap */}
       {/* 左侧面板: 历史记录 */}
       <div className="flex flex-col w-[280px] p-4 border border-gray-100 rounded-xl shadow-lg bg-white overflow-hidden">
+        <LoginStatus
+          currentUser={currentUser}
+          onLoginClick={() => { setShowAuthModal(true); setAuthMode('login'); }}
+          onRegisterClick={() => { setShowAuthModal(true); setAuthMode('register'); }}
+          onLogoutClick={handleLogout}
+          onAdminPanelClick={() => setShowAdminPanel(true)}
+        />
         <HistoryPanel history={history} onLoadHistoryItem={handleLoadHistoryItem} onDeleteHistoryItem={handleDeleteHistoryItem} />
       </div>
 
@@ -1265,33 +1350,34 @@ const App: React.FC = () => {
         
         <div className="flex items-center justify-end w-full text-sm text-gray-600 mb-6">
           <span>积分剩余: <span className="font-semibold text-blue-600">{credits}</span></span>
-          <button className="ml-4 text-blue-500 hover:text-blue-700 font-medium" onClick={() => alert("充值功能暂未开放。")}>充值</button>
+          <button className="ml-4 text-blue-500 hover:text-blue-700 font-medium" onClick={() => setShowPaymentModal(true)}>充值</button>
         </div>
 
         <div className="flex flex-col gap-6 flex-[2] min-h-0"> {/* Main editor area, 2/3 height, scrollable */}
           {/* Unified Image Display */}
           <UnifiedImageDisplay
-            selectedImageBase64={selectedImageBase64}
-            selectedImageMimeType={selectedImageMimeType}
+            allUploadedImages={allUploadedImages}
+            activeImageId={activeImageId}
             editedImageBase64={editedImageBase64}
             onImageSelect={handleImageSelect}
             onClearImage={handleClearImage}
-            onDownloadEditedImage={() => { // Inline download function for edited image
+            onDownloadEditedImage={() => {
               if (editedImageBase64) {
                 const link = document.createElement('a');
                 link.href = `data:image/png;base64,${editedImageBase64}`;
                 link.download = `edited_image_${Date.now()}.png`;
                 document.body.appendChild(link);
                 link.click();
-                document.body.removeChild(link);
+                document.body.removeChild(link); // Clean up the link element
               }
             }}
-            onMergeRequest={() => setShowMergeImageModal(true)}
+            onMergeRequest={() => {}} // Placeholder for removed functionality
             isLoading={isLoading}
+            setActiveImageId={setActiveImageId}
           />
 
           {/* Clear Session Button */}
-          {(selectedImageBase64 || editedImageBase64 || prompt.trim()) && (
+          {(allUploadedImages.length > 0 || editedImageBase64 || prompt.trim()) && (
             <button
               onClick={handleClearCurrentSession}
               className="w-full py-2 px-4 bg-red-500 text-white font-semibold rounded-md hover:bg-red-600 transition-colors disabled:bg-red-300"
@@ -1302,7 +1388,7 @@ const App: React.FC = () => {
           )}
 
           {/* Prompt Input and Edit Button */}
-          <div className="flex flex-col gap-4 w-full mt-4"> {/* Added mt-4 for spacing */}
+          <div className="flex flex-col gap-4 w-full mt-4">
             <label htmlFor="prompt-input" className="text-base font-semibold text-gray-700">
               您的提示词:
             </label>
@@ -1331,17 +1417,9 @@ const App: React.FC = () => {
               aria-label="图片编辑的文本提示词"
             ></textarea>
 
-            {/* AI Prompt Suggestions */}
-            <PromptSuggestions
-              suggestions={aiSuggestions}
-              onSelectSuggestion={handleSelectSuggestion}
-              isLoading={isSuggesting}
-              error={suggestionError}
-            />
-
             <button
               onClick={handleEditImage}
-              disabled={!canEdit} // Use canEdit variable for button
+              disabled={!canEdit}
               className="w-full py-3 px-6 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
               aria-live="polite"
             >
@@ -1361,7 +1439,7 @@ const App: React.FC = () => {
       </div>
 
       {/* 右侧面板: 模板选择器 */}
-      <div className="flex flex-col w-[320px] p-6 border border-gray-100 rounded-xl shadow-lg bg-white flex-grow-0 flex-shrink-0 min-h-0"> {/* fixed width for templates */}
+      <div className="flex flex-col w-[320px] p-6 border border-gray-100 rounded-xl shadow-lg bg-white flex-grow-0 flex-shrink-0 min-h-0 h-full">
         <div className="flex justify-between items-center mb-4 sticky top-0 bg-white py-2 z-10">
           <h3 className="text-lg font-semibold text-gray-700">选择模板:</h3>
           <button
@@ -1374,8 +1452,8 @@ const App: React.FC = () => {
           </button>
         </div>
         <PromptTemplateSelector
-          categories={INITIAL_CATEGORIZED_TEMPLATES} // Pass categories
-          userTemplates={userTemplates} // Pass user-defined templates separately
+          categories={INITIAL_CATEGORIZED_TEMPLATES}
+          userTemplates={userTemplates}
           onSelectTemplate={handleSelectTemplate}
           selectedTemplateId={selectedTemplateId}
           disabled={isLoading || !selectedImageBase64}
@@ -1389,17 +1467,54 @@ const App: React.FC = () => {
           onClose={() => setShowAddTemplateModal(false)}
           onSave={handleAddTemplate}
           disabled={isLoading}
-          availableCategories={INITIAL_CATEGORIZED_TEMPLATES} // Pass categories to modal
+          availableCategories={INITIAL_CATEGORIZED_TEMPLATES}
         />
       )}
 
-      {showMergeImageModal && editedImageBase64 && (
-        <MergeImageModal
-          onClose={() => setShowMergeImageModal(false)}
-          onMerge={handleMergeImages}
-          baseImageBase64={editedImageBase64}
-          baseImageMimeType="image/png" // Assuming edited output is PNG
+      {showAuthModal && (
+        <AuthModal
+          mode={authMode}
+          onClose={() => setShowAuthModal(false)}
+          onLogin={handleLogin}
+          onRegister={handleRegister}
           disabled={isLoading}
+        />
+      )}
+
+      {showPaymentModal && (
+        <PaymentModal
+          onClose={() => setShowPaymentModal(false)}
+          onPaymentSuccess={(amount) => {
+            handleUpdateCredits(amount);
+            setShowPaymentModal(false);
+          }}
+          pricePerCredit={adminService.getPaymentConfig().pricePerCredit}
+          disabled={isLoading}
+        />
+      )}
+
+      {showAdminPanel && currentUser?.isAdmin && (
+        <AdminPanel
+          onClose={() => setShowAdminPanel(false)}
+          currentUser={currentUser}
+          onUpdateUser={(updatedUser) => {
+            authService.adminUpdateUser(updatedUser);
+            if (currentUser.id === updatedUser.id) {
+              setCurrentUser(updatedUser);
+              setCredits(updatedUser.credits);
+            }
+            setShowAdminPanel(false); // Force re-render of user list by closing/opening (simple fix)
+            setTimeout(() => setShowAdminPanel(true), 0);
+          }}
+          onDeleteUser={(userId) => {
+            authService.deleteUser(userId);
+            if (currentUser.id === userId) {
+              handleLogout();
+            } else {
+              setShowAdminPanel(false); // Force re-render of user list
+              setTimeout(() => setShowAdminPanel(true), 0);
+            }
+          }}
         />
       )}
     </div>
